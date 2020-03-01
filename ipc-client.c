@@ -65,7 +65,7 @@ int ipc_open_socket(const char *socket_path) {
 	strncpy(addr.sun_path, socket_path, sizeof(addr.sun_path) - 1);
 	addr.sun_path[sizeof(addr.sun_path) - 1] = 0;
 	int l = sizeof(struct sockaddr_un);
-	if (connect(socketfd, (struct sockaddr *)&addr, l) == -1) {
+	if (connect(socketfd, (struct sockaddr*)&addr, l) == -1) {
 		printf("Unable to connect to %s\n", socket_path);
 		exit(1);
 	}
@@ -88,7 +88,8 @@ struct ipc_response *ipc_recv_response(int socketfd) {
 	while (total < IPC_HEADER_SIZE) {
 		ssize_t received = recv(socketfd, data + total, IPC_HEADER_SIZE - total, 0);
 		if (received <= 0) {
-			printf("Unable to receive IPC response\n");
+			if (received == -1) exit(0);
+			printf("IPC error: %ld\n", received);
 			exit(1);
 		}
 		total += received;

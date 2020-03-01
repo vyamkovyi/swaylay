@@ -24,18 +24,18 @@
 
 #include <signal.h>
 
-static volatile sig_atomic_t keep_listening = 1;
 
 char *socket_path = NULL;
 char *identifier = NULL;
-int socketfd = 0;
+static volatile sig_atomic_t socketfd = 0;
 
 void sig_handler(int _) {
 	(void)_;
-	keep_listening = 0;
+	printf("\n");
 	close(socketfd);
 	free(identifier);
 	free(socket_path);
+	socketfd = 0;
 }
 
 static bool success_object(json_object *result) {
@@ -97,20 +97,21 @@ const char* layout_from_response(struct json_object* obj) {
 }
 
 int main(int argc, char** argv) {
-
-	static struct option long_options[] = {
+	static const struct option long_options[] = {
 		{"help", no_argument, NULL, 'h'},
 		{"socket", required_argument, NULL, 's'},
 		{"version", no_argument, NULL, 'v'},
 		{0, 0, 0, 0}
 	};
 
-	const char *usage =
+	const char* const usage =
 		"Usage: swaylay [options] [identifier]\n"
 		"\n"
 		"  -h, --help             Show help message and quit.\n"
 		"  -s, --socket <socket>  Use the specified socket.\n"
-		"  -v, --version          Show the version number and quit.\n";
+		"  -v, --version          Show the version number and quit.\n"
+		"\n"
+		"Default identifier is 1:1:AT_Translated_Set_2_keyboard.\n";
 
 
 	int c;
@@ -126,11 +127,12 @@ int main(int argc, char** argv) {
 			socket_path = strdup(optarg);
 			break;
 		case 'v':
-			fprintf(stdout, "swaymsg version %s\n", SWAYLAY_VERSION);
+			fprintf(stdout, "swaylay version %s\n", SWAYLAY_VERSION);
+			fprintf(stdout, "https://github.com/Hexawolf/swaylay\n");
 			exit(EXIT_SUCCESS);
 			break;
 		default:
-			fprintf(stderr, "%s", usage);
+			fprintf(stderr, usage, identifier);
 			exit(EXIT_FAILURE);
 		}
 	}
@@ -145,50 +147,42 @@ int main(int argc, char** argv) {
 	}
 
 	const uint32_t type = IPC_SUBSCRIBE;
-	if (optind < argc) {
-		identifier = join_args(argv + optind, argc - optind);
-	} else {
-		identifier = strdup("");
-	}
-	char *command = strdup("[\"input\"]");
-
-	int ret = 0;
+	const char* const command = "[\"input\"]";
 	socketfd = ipc_open_socket(socket_path);
 	struct timeval timeout = {.tv_sec = 3, .tv_usec = 0};
 	ipc_set_recv_timeout(socketfd, timeout);
 	uint32_t len = strlen(command);
 	char *resp = ipc_single_command(socketfd, type, command, &len);
-
-	// print the json
 	json_object *obj = json_tokener_parse(resp);
 	if (obj == NULL) {
-		fprintf(stderr, "ERROR: Could not parse json response from ipc. "
-				"This is a bug in sway.");
+		fprintf(stderr, "ERROR: Could not parse json response from ipc."
+			" This is a bug in sway.");
 		printf("%s\n", resp);
-		ret = 1;
+		return 1;
 	} else {
 		if (!success(obj, true)) {
-			ret = 2;
-		}
-		if (ret != 0) {
 			printf("%s\n", json_object_to_json_string_ext(obj,
 				JSON_C_TO_STRING_PRETTY | JSON_C_TO_STRING_SPACED));
+			return 1;
 		}
 		json_object_put(obj);
 	}
-	free(command);
-	free(resp);
+	free(resp); resp = 0;
 
-	if (ret != 0) {
-		printf("Failed to parse JSON object\n");
-		exit(1);
+	if (optind < argc) {
+		free(identifier);
+		identifier = join_args(argv + optind, argc - optind);
+	} else {
+		// Default for many systems
+		identifier = strdup("1:1:AT_Translated_Set_2_keyboard");
 	}
+
 	// Remove the timeout for subscribed events
 	timeout.tv_sec = 0;
 	timeout.tv_usec = 0;
 	ipc_set_recv_timeout(socketfd, timeout);
-
 	signal(SIGINT, sig_handler);
+
 	do {
 		struct ipc_response* response = ipc_recv_response(socketfd);
 		if (!response) {
@@ -203,7 +197,7 @@ int main(int argc, char** argv) {
 		}
 		if (obj != NULL) json_object_put(obj);
 		free_ipc_response(response);
-	} while (keep_listening);
-
-	return ret;
+	} while (socketfd);
+	
+	return 0;
 }

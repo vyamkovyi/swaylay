@@ -1,19 +1,28 @@
-# sway layout indicator
-> swaylay
+# swaylay
 
-swaylay is a layout indication utility for
-[sway](https://github.com/swaywm/sway).
+swaylay is a layout indicator for [sway](https://github.com/swaywm/sway).
+
+## Usage
+
+```
+Usage swaylay [options] [identifier]
+
+  -h, --help             Show help message and quit.
+  -s, --socket <socket>  Use the specified socket.
+  -v, --version          Show the version number and quit.
+
+Default identifier is 1:1:AT_Translated_Set_2_keyboard.
+```
 
 ## Building
 
 Install dependencies:
 
-* git \*
-* meson \*
+* git, meson, ninja \*
 * json-c
 * sway
 
-_\*Compile-time dep_
+_\*Compile-time deps_
 
 Run these commands:
 
