@@ -70,22 +70,47 @@ static bool success(json_object *r, bool fallback) {
 	return true;
 }
 
+const char* layout_from_response(char* identifier, struct ipc_response* response) {
+	json_object *obj = json_tokener_parse(response->payload);
+	if (obj == NULL) {
+		return NULL;
+	}
+	struct json_object* iobj;
+	struct json_object* iobj_identifier;
+	struct json_object* iobj_active_layout;
+	json_bool exists = json_object_object_get_ex(obj, "input", &iobj);
+	if (!exists) {
+		return NULL;
+	}
+	exists = json_object_object_get_ex(iobj, "identifier", &iobj_identifier);
+	if (!exists) {
+		return NULL;
+	}
+	exists = json_object_object_get_ex(iobj,
+			"xkb_active_layout_name", &iobj_active_layout);
+	if (!exists) {
+		return NULL;
+	}
+	// If strings are different
+	if (strcmp(json_object_get_string(iobj_identifier), identifier)) {
+		return NULL;
+	}
+	return json_object_get_string(iobj_active_layout);
+}
+
 int main(int argc, char** argv) {
-	static bool quiet = false;
 
 	static struct option long_options[] = {
 		{"help", no_argument, NULL, 'h'},
-		{"quiet", no_argument, NULL, 'q'},
 		{"socket", required_argument, NULL, 's'},
 		{"version", no_argument, NULL, 'v'},
 		{0, 0, 0, 0}
 	};
 
 	const char *usage =
-		"Usage: swaylay [options] [message]\n"
+		"Usage: swaylay [options] [identifier]\n"
 		"\n"
 		"  -h, --help             Show help message and quit.\n"
-		"  -q, --quiet            Be quiet.\n"
 		"  -s, --socket <socket>  Use the specified socket.\n"
 		"  -v, --version          Show the version number and quit.\n";
 
@@ -99,9 +124,6 @@ int main(int argc, char** argv) {
 			break;
 		}
 		switch (c) {
-		case 'q': // Quiet
-			quiet = true;
-			break;
 		case 's': // Socket
 			socket_path = strdup(optarg);
 			break;
@@ -118,21 +140,19 @@ int main(int argc, char** argv) {
 	if (!socket_path) {
 		socket_path = get_socketpath();
 		if (!socket_path) {
-			if (!quiet) {
-				printf("Unable to retrieve socket path\n");
-			}
+			printf("Unable to retrieve socket path\n");
 			exit(EXIT_FAILURE);
 		}
 	}
 
 	const uint32_t type = IPC_SUBSCRIBE;
-
-	char *command = NULL;
+	char *identifier = NULL;
 	if (optind < argc) {
-		command = join_args(argv + optind, argc - optind);
+		identifier = join_args(argv + optind, argc - optind);
 	} else {
-		command = strdup("");
+		identifier = strdup("");
 	}
+	char *command = strdup("[\"input\"]");
 
 	int ret = 0;
 	socketfd = ipc_open_socket(socket_path);
@@ -144,17 +164,15 @@ int main(int argc, char** argv) {
 	// print the json
 	json_object *obj = json_tokener_parse(resp);
 	if (obj == NULL) {
-		if (!quiet) {
-			fprintf(stderr, "ERROR: Could not parse json response from ipc. "
-					"This is a bug in sway.");
-			printf("%s\n", resp);
-		}
+		fprintf(stderr, "ERROR: Could not parse json response from ipc. "
+				"This is a bug in sway.");
+		printf("%s\n", resp);
 		ret = 1;
 	} else {
 		if (!success(obj, true)) {
 			ret = 2;
 		}
-		if (!quiet && ret != 0) {
+		if (ret != 0) {
 			printf("%s\n", json_object_to_json_string_ext(obj,
 				JSON_C_TO_STRING_PRETTY | JSON_C_TO_STRING_SPACED));
 		}
@@ -174,28 +192,16 @@ int main(int argc, char** argv) {
 
 	signal(SIGINT, sig_handler);
 	do {
-		struct ipc_response *reply = ipc_recv_response(socketfd);
-		if (!reply) {
+		struct ipc_response* response = ipc_recv_response(socketfd);
+		if (!response) {
 			break;
 		}
-
-		json_object *obj = json_tokener_parse(reply->payload);
-		if (obj == NULL) {
-			if (!quiet) {
-				fprintf(stderr, "ERROR: Could not parse json response from"
-						" ipc. This is a bug in sway.");
-				ret = 1;
-			}
-			break;
-		} else if (quiet) {
-			json_object_put(obj);
-		} else {
-			printf("%s\n", json_object_to_json_string(obj));
+		const char* lay = layout_from_response(identifier, response);
+		if (lay != NULL) {
+			printf("%s\n", lay);
 			fflush(stdout);
-			json_object_put(obj);
 		}
-
-		free_ipc_response(reply);
+		free_ipc_response(response);
 	} while (keep_listening);
 
 	free(socket_path);
