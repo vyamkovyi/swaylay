@@ -132,7 +132,7 @@ int main(int argc, char** argv) {
 			exit(EXIT_SUCCESS);
 			break;
 		default:
-			fprintf(stderr, usage, identifier);
+			fprintf(stderr, "%s", usage);
 			exit(EXIT_FAILURE);
 		}
 	}
