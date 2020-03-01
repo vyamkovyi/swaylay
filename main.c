@@ -27,12 +27,15 @@
 static volatile sig_atomic_t keep_listening = 1;
 
 char *socket_path = NULL;
+char *identifier = NULL;
 int socketfd = 0;
 
 void sig_handler(int _) {
 	(void)_;
 	keep_listening = 0;
 	close(socketfd);
+	free(identifier);
+	free(socket_path);
 }
 
 static bool success_object(json_object *result) {
@@ -70,32 +73,27 @@ static bool success(json_object *r, bool fallback) {
 	return true;
 }
 
-const char* layout_from_response(char* identifier, struct ipc_response* response) {
-	json_object *obj = json_tokener_parse(response->payload);
-	if (obj == NULL) {
-		return NULL;
-	}
-	struct json_object* iobj;
-	struct json_object* iobj_identifier;
-	struct json_object* iobj_active_layout;
-	json_bool exists = json_object_object_get_ex(obj, "input", &iobj);
+const char* layout_from_response(struct json_object* obj) {
+	struct json_object* o[3];
+	json_bool exists = json_object_object_get_ex(obj, "input", &o[0]);
 	if (!exists) {
 		return NULL;
 	}
-	exists = json_object_object_get_ex(iobj, "identifier", &iobj_identifier);
-	if (!exists) {
-		return NULL;
-	}
-	exists = json_object_object_get_ex(iobj,
-			"xkb_active_layout_name", &iobj_active_layout);
+	exists = json_object_object_get_ex(o[0], "identifier", &o[1]);
 	if (!exists) {
 		return NULL;
 	}
 	// If strings are different
-	if (strcmp(json_object_get_string(iobj_identifier), identifier)) {
+	if (strcmp(json_object_get_string(o[1]), identifier)) {
 		return NULL;
 	}
-	return json_object_get_string(iobj_active_layout);
+	exists = json_object_object_get_ex(o[0],
+			"xkb_active_layout_name", &o[2]);
+	if (!exists) {
+		return NULL;
+	}
+	const char* obj3 = json_object_get_string(o[2]);
+	return obj3;
 }
 
 int main(int argc, char** argv) {
@@ -141,12 +139,12 @@ int main(int argc, char** argv) {
 		socket_path = get_socketpath();
 		if (!socket_path) {
 			printf("Unable to retrieve socket path\n");
+			free(socket_path);
 			exit(EXIT_FAILURE);
-		}
+		}
 	}
 
 	const uint32_t type = IPC_SUBSCRIBE;
-	char *identifier = NULL;
 	if (optind < argc) {
 		identifier = join_args(argv + optind, argc - optind);
 	} else {
@@ -196,14 +194,16 @@ int main(int argc, char** argv) {
 		if (!response) {
 			break;
 		}
-		const char* lay = layout_from_response(identifier, response);
+		const char* lay = NULL;
+		json_object* obj = json_tokener_parse(response->payload);
+		if (obj != NULL) lay = layout_from_response(obj);
 		if (lay != NULL) {
 			printf("%c%c\n", lay[0], toupper(lay[1]));
 			fflush(stdout);
 		}
+		if (obj != NULL) json_object_put(obj);
 		free_ipc_response(response);
 	} while (keep_listening);
 
-	free(socket_path);
 	return ret;
 }
