@@ -198,7 +198,7 @@ int main(int argc, char** argv) {
 		}
 		const char* lay = layout_from_response(identifier, response);
 		if (lay != NULL) {
-			printf("%s\n", lay);
+			printf("%c%c\n", lay[0], toupper(lay[1]));
 			fflush(stdout);
 		}
 		free_ipc_response(response);
