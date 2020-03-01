@@ -10,6 +10,7 @@ Install dependencies:
 
 * git \*
 * meson \*
+* json-c
 * sway
 
 _\*Compile-time dep_
@@ -25,8 +26,7 @@ $ sudo ninja -C build install
 ## License
 
 This code is licensed under MIT license.
-See [LISENCE](LICENSE) for more information.
+See [LICENSE](LICENSE) for more information.
 
 This code is heavily based on swaymsg and other [sway](https://swaywm.org/)
 parts, made by [Drew DeVault](https://drewdevault.com/).
-Thank you very much for creating sway.
