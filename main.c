@@ -22,6 +22,19 @@
 	#define SWAYLAY_VERSION "undefined"
 #endif
 
+#include <signal.h>
+
+static volatile sig_atomic_t keep_listening = 1;
+
+char *socket_path = NULL;
+int socketfd = 0;
+
+void sig_handler(int _) {
+	(void)_;
+	keep_listening = 0;
+	close(socketfd);
+}
+
 static bool success_object(json_object *result) {
 	json_object *success;
 
@@ -58,9 +71,7 @@ static bool success(json_object *r, bool fallback) {
 }
 
 int main(int argc, char** argv) {
-	printf("Hello World!\n");
 	static bool quiet = false;
-	char *socket_path = NULL;
 
 	static struct option long_options[] = {
 		{"help", no_argument, NULL, 'h'},
@@ -124,13 +135,13 @@ int main(int argc, char** argv) {
 	}
 
 	int ret = 0;
-	int socketfd = ipc_open_socket(socket_path);
+	socketfd = ipc_open_socket(socket_path);
 	struct timeval timeout = {.tv_sec = 3, .tv_usec = 0};
 	ipc_set_recv_timeout(socketfd, timeout);
 	uint32_t len = strlen(command);
 	char *resp = ipc_single_command(socketfd, type, command, &len);
 
-	// pretty print the json
+	// print the json
 	json_object *obj = json_tokener_parse(resp);
 	if (obj == NULL) {
 		if (!quiet) {
@@ -161,6 +172,7 @@ int main(int argc, char** argv) {
 	timeout.tv_usec = 0;
 	ipc_set_recv_timeout(socketfd, timeout);
 
+	signal(SIGINT, sig_handler);
 	do {
 		struct ipc_response *reply = ipc_recv_response(socketfd);
 		if (!reply) {
@@ -184,9 +196,8 @@ int main(int argc, char** argv) {
 		}
 
 		free_ipc_response(reply);
-	} while (1);
+	} while (keep_listening);
 
-	close(socketfd);
 	free(socket_path);
 	return ret;
 }

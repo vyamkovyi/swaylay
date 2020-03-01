@@ -8,7 +8,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
-#include "ipc-client.h"
+#include "include/ipc-client.h"
 
 static const char ipc_magic[] = {'i', '3', '-', 'i', 'p', 'c'};
 
