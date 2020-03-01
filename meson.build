@@ -46,7 +46,7 @@ if git.found()
 		version = '"@0@-@1@ (" __DATE__ ", branch \'@2@\')"'.format(
 			meson.project_version(),
 			git_commit.stdout().strip(),
-			git_branch.stdout().stio(),
+			git_branch.stdout().strip(),
 		)
 	endif
 endif
@@ -104,7 +104,6 @@ config.set('sysconfdir', join_paths(prefix, sysconfdir))
 
 executable(
 	'swaylay', [
-		'stringop.c',
 		'ipc-client.c',
 		'main.c',
 	],
