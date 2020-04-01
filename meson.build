@@ -1,25 +1,12 @@
-project(
-	'swaylay',
-	'c',
+project('swaylay', 'c',
 	version: '1.0.0',
 	license: 'MIT',
 	meson_version: '>=0.48.0',
 	default_options: [
 		'c_std=c11',
-		'warning_level=2',
+		'warning_level=3',
 		'werror=true',
 	],
-)
-
-add_project_arguments(
-	[
-		'-Wno-unused-parameter',
-		'-Wno-unused-result',
-		'-Wno-missing-braces',
-		'-Wundef',
-		'-Wvla',
-	],
-	language: 'c',
 )
 
 cc = meson.get_compiler('c')
