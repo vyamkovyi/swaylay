@@ -2,6 +2,8 @@
 
 swaylay is a layout indicator for [sway](https://github.com/swaywm/sway).
 
+Note that Waybar [has this implemented](https://github.com/Alexays/Waybar/blob/master/man/waybar-sway-language.5.scd) already.
+
 ## Usage
 
 ```
